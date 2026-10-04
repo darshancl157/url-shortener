@@ -1,0 +1,104 @@
+.form {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+/* Input + button row: stacked on mobile, side by side on larger screens */
+.form .row {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form .input {
+  flex: 1;
+  min-width: 0; /* lets the input shrink inside flex instead of overflowing */
+  width: 100%;
+  height: 48px;
+  padding: 0 16px;
+  font-size: 1rem; /* 16px+ stops iOS Safari from zooming in on focus */
+  color: var(--text);
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  outline: none;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+.form .input::placeholder {
+  color: #9ca3af;
+}
+
+.form .input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(7, 34, 48, 0.2);
+}
+
+.form .input[aria-invalid="true"] {
+  border-color: var(--error);
+}
+
+.form .input[aria-invalid="true"]:focus {
+  box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.2);
+}
+
+.form .button {
+  height: 48px;
+  padding: 0 24px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #ffffff;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.2s,
+    transform 0.1s;
+}
+
+.form .button:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.form .button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.form .button:focus-visible {
+  outline: 3px solid rgba(7, 34, 48, 0.4);
+  outline-offset: 2px;
+}
+
+.form .button:disabled {
+  background: #607d89;
+  cursor: not-allowed;
+}
+
+.form .error {
+  margin: 8px 0 0;
+  font-size: 0.875rem;
+  color: var(--error);
+}
+
+/* Tablet and up: input and button on one line */
+@media (min-width: 576px) {
+  .form .row {
+    flex-direction: row;
+  }
+
+  .form .button {
+    min-width: 140px; /* keeps width steady when the label changes to "Shortening…" */
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .form .input,
+  .form .button {
+    transition: none;
+  }
+}
