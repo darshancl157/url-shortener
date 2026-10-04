@@ -45,54 +45,54 @@ jobs:
 
       - run: npm run build
 
-    migrations:
-      runs-on: ubuntu-latest
-      services:
-        postgres:
-          image: postgres:17
-          env:
-            POSTGRES_USER: postgres
-            POSTGRES_PASSWORD: postgres
-            POSTGRES_DB: url_shortener_ci
-          ports:
-            - 5432:5432
-          options: >-
-            --health-cmd "pg_isready -U postgres"
-            --health-interval 5s
-            --health-timeout 5s
-            --health-retries 10
-      env:
-        DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/url_shortener_ci
-      defaults:
-        run:
-          working-directory: backend
-      steps:
-        - uses: actions/checkout@v4
+  migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: url_shortener_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/url_shortener_ci
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
 
-        - uses: actions/setup-python@v5
-          with:
-            python-version: "3.14"
-            cache: pip
-            cache-dependency-path: backend/requirements.txt
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
 
-        - run: pip install -r requirements.txt
+      - run: pip install -r requirements.txt
 
-        - name: Upgrade to head
-          run: alembic upgrade head
+      - name: Upgrade to head
+        run: alembic upgrade head
 
-        - name: Check the urls table exists
-          run: |
-            python -c "
-            import os
-            from sqlalchemy import create_engine, text
-            e = create_engine(os.environ['DATABASE_URL'])
-            t = e.connect().execute(text(\"select to_regclass('public.urls')\")).scalar()
-            assert t == 'urls', f'urls table missing: {t}'
-            print('urls table OK')
-            "
+      - name: Check the urls table exists
+        run: |
+          python -c "
+          import os
+          from sqlalchemy import create_engine, text
+          e = create_engine(os.environ['DATABASE_URL'])
+          t = e.connect().execute(text(\"select to_regclass('public.urls')\")).scalar()
+          assert t == 'urls', f'urls table missing: {t}'
+          print('urls table OK')
+          "
 
-        - name: Downgrade to base
-          run: alembic downgrade base
+      - name: Downgrade to base
+        run: alembic downgrade base
 
-        - name: Upgrade to head again
-          run: alembic upgrade head
+      - name: Upgrade to head again
+        run: alembic upgrade head
