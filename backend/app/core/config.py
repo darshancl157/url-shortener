@@ -43,8 +43,7 @@ def get_settings() -> Settings:
     database_url = os.getenv("DATABASE_URL", "")
     if not database_url:
         raise RuntimeError(
-            "DATABASE_URL is not set. Example: "
-            "postgresql+psycopg://user:password@localhost:5432/url_shortener"
+            "DATABASE_URL is not set."
         )
     allow_localhost = os.getenv("CORS_ALLOW_LOCALHOST", "true").lower() in {"1", "true", "yes"}
     return Settings(
