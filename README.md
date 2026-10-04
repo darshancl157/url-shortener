@@ -9,7 +9,7 @@ cd backend
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-copy .env.example .env        # then edit DATABASE_URL
+copy .env.example .env        # then edit the DATABASE_URL
 alembic upgrade head          # apply database migrations
 uvicorn app.main:app --reload
 ```
