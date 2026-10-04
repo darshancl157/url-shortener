@@ -17,3 +17,7 @@
   justify-content: center;
   padding: 48px 0;
 }
+
+.app-content {
+  width: 100%;
+}
