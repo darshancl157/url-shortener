@@ -1,0 +1,36 @@
+name: Deploy
+
+on:
+  push:
+    branches: ["release/**", main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  migrate-uat:
+    if: startsWith(github.ref, 'refs/heads/release/')
+    needs: ci
+    runs-on: ubuntu-latest
+    environment: uat
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-backend
+      - name: Revision before
+        run: alembic current
+      - name: Upgrade to head
+        run: alembic upgrade head
+      - name: Revision after
+        run: alembic current
