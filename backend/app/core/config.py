@@ -49,7 +49,7 @@ def get_settings() -> Settings:
     return Settings(
         database_url=database_url,
         base_url=os.getenv("BASE_URL", Settings.base_url).rstrip("/"),
-        git_commit=os.getenv("GIT_COMMIT", Settings.git_commit),
+        git_commit=os.getenv("RENDER_GIT_COMMIT", Settings.git_commit),
         cors_origins=_split_csv(os.getenv("CORS_ORIGINS", "")),
         cors_origin_regex=Settings.cors_origin_regex if allow_localhost else None,
     )
