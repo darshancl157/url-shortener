@@ -34,3 +34,13 @@ jobs:
         run: alembic upgrade head
       - name: Revision after
         run: alembic current
+  deploy-uat:
+    if: startsWith(github.ref, 'refs/heads/release/')
+    needs: migrate-uat
+    runs-on: ubuntu-latest
+    environment: uat
+    steps:
+      - name: Trigger Render deploy of this exact commit
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: curl --fail-with-body -sS -X POST "$HOOK&ref=$GITHUB_SHA"
