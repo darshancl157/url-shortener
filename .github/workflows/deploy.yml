@@ -34,16 +34,18 @@ jobs:
         run: alembic upgrade head
       - name: Revision after
         run: alembic current
+
   deploy-uat:
     if: startsWith(github.ref, 'refs/heads/release/')
     needs: migrate-uat
     runs-on: ubuntu-latest
     environment: uat
     steps:
-      - name: Trigger Render deploy of this exact commit
+      - name: Trigger Render deploy of this exact commit (API)
         env:
           HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
         run: curl --fail-with-body -sS -X POST "$HOOK&ref=$GITHUB_SHA"
+
   smoke-uat:
     if: startsWith(github.ref, 'refs/heads/release/')
     needs: deploy-uat
@@ -53,22 +55,44 @@ jobs:
     env:
       API_URL: ${{ vars.API_URL }}
     steps:
-      - name: Wait until UAT serves this commit
-        run: |
-          for i in $(seq 1 40); do
-            commit=$(curl -s --max-time 30 "$API_URL/health" | jq -r '.commit // empty' 2>/dev/null || true)
-            echo "attempt $i: UAT is serving '${commit:-no response}', want $GITHUB_SHA"
-            if [ ${#commit} -ge 7 ] && [[ "$GITHUB_SHA" == "$commit"* ]]; then
-              echo "UAT is running this commit"
-              exit 0
-            fi
-            sleep 15
-          done
-          echo "UAT did not start serving $GITHUB_SHA within 10 minutes"
-          exit 1
-
-      - name: App can query the database
+      - uses: actions/checkout@v4
+      - name: Wait until the API serves this commit
+        run: bash .github/scripts/wait-for-commit.sh "$API_URL/health"
+      - name: API can query the database
         run: |
           code=$(curl -s -o body.json -w '%{http_code}' "$API_URL/api/stats/smoke-check-missing")
           cat body.json; echo
           test "$code" = "404"
+
+  deploy-uat-web:
+    if: startsWith(github.ref, 'refs/heads/release/')
+    needs: smoke-uat
+    runs-on: ubuntu-latest
+    environment: uat
+    steps:
+      - name: Trigger Render deploy of this exact commit (web)
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
+        run: curl --fail-with-body -sS -X POST "$HOOK&ref=$GITHUB_SHA"
+
+  smoke-uat-web:
+    if: startsWith(github.ref, 'refs/heads/release/')
+    needs: deploy-uat-web
+    runs-on: ubuntu-latest
+    environment: uat
+    timeout-minutes: 15
+    env:
+      API_URL: ${{ vars.API_URL }}
+      WEB_URL: ${{ vars.WEB_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait until the site serves this commit
+        run: bash .github/scripts/wait-for-commit.sh "$WEB_URL/version.json"
+      - name: Site's index page loads
+        run: curl --fail -sS "$WEB_URL/" | grep -q '<div id="root">'
+      - name: API allows the site's origin (CORS)
+        run: |
+          allowed=$(curl -s -D - -o /dev/null -H "Origin: $WEB_URL" "$API_URL/health" \
+            | tr -d '\r' | awk -F': ' 'tolower($1)=="access-control-allow-origin"{print $2}')
+          echo "API allows origin: '${allowed}'"
+          test "$allowed" = "$WEB_URL"
