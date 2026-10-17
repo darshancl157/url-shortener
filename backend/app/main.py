@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    if len(settings.jwt_secret) < 32:
+        raise RuntimeError("JWT_SECRET must be set to a random string of at least 32 characters.")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
