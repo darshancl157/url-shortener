@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import health, urls
+from app.api.routes import auth, health, urls
 from app.core.config import get_settings
 from app.core.exceptions import AppError
 from app.db.database import check_connection, make_engine
@@ -45,6 +45,7 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
 
     app.include_router(health.router)
+    app.include_router(auth.router)
     app.include_router(urls.router)
     app.include_router(urls.redirect_router)  # catch-all, keep last
     return app
