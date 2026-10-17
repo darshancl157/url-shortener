@@ -27,3 +27,7 @@ class ConflictError(AppError):
 class IdGenerationError(AppError):
     status_code = 503
     message = "Could not generate a unique short ID. Try again."
+
+class UnauthorizedError(AppError):
+    status_code = 401
+    message = "Not authenticated."

@@ -36,6 +36,9 @@ class Settings:
     max_url_length: int = 2048
     max_id_attempts: int = 10
     git_commit: str = "unknown"
+    jwt_secret: str = ""
+    access_token_ttl_minutes: int = 15
+    refresh_token_ttl_days: int = 14
 
 @lru_cache
 def get_settings() -> Settings:
@@ -52,4 +55,5 @@ def get_settings() -> Settings:
         git_commit=os.getenv("RENDER_GIT_COMMIT", Settings.git_commit),
         cors_origins=_split_csv(os.getenv("CORS_ORIGINS", "")),
         cors_origin_regex=Settings.cors_origin_regex if allow_localhost else None,
+        jwt_secret=os.getenv("JWT_SECRET", ""),
     )
