@@ -60,7 +60,7 @@ jobs:
         run: bash .github/scripts/wait-for-commit.sh "$API_URL/health"
       - name: API can query the database
         run: |
-          code=$(curl -s -o body.json -w '%{http_code}' "$API_URL/api/stats/smoke-check-missing")
+          code=$(curl -s -o body.json -w '%{http_code}' "$API_URL/smoke-check-missing")
           cat body.json; echo
           test "$code" = "404"
 
@@ -82,7 +82,6 @@ jobs:
     environment: uat
     timeout-minutes: 15
     env:
-      API_URL: ${{ vars.API_URL }}
       WEB_URL: ${{ vars.WEB_URL }}
     steps:
       - uses: actions/checkout@v4
@@ -90,9 +89,9 @@ jobs:
         run: bash .github/scripts/wait-for-commit.sh "$WEB_URL/version.json"
       - name: Site's index page loads
         run: curl --fail -sS "$WEB_URL/" | grep -q '<div id="root">'
-      - name: API allows the site's origin (CORS)
+      - name: Site forwards /api to the API (same-origin proxy)
         run: |
-          allowed=$(curl -s -D - -o /dev/null -H "Origin: $WEB_URL" "$API_URL/health" \
-            | tr -d '\r' | awk -F': ' 'tolower($1)=="access-control-allow-origin"{print $2}')
-          echo "API allows origin: '${allowed}'"
-          test "$allowed" = "$WEB_URL"
+          code=$(curl -s -o body.json -w '%{http_code}' -X POST "$WEB_URL/api/auth/refresh")
+          cat body.json; echo
+          test "$code" = "401"
+          grep -q '"detail"' body.json

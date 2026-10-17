@@ -10,17 +10,20 @@ class UrlRepository:
     def __init__(self, engine: Engine):
         self._engine = engine
 
-    def insert(self, short_id: str, long_url: str, expires_at: datetime | None) -> bool:
+    def insert(
+        self, short_id: str, long_url: str, expires_at: datetime | None, user_id: int
+    ) -> bool:
         """Insert a row. Returns False if short_id already exists."""
         with self._engine.begin() as conn:
             row = conn.execute(
                 text(
-                    "INSERT INTO urls (short_id, long_url, expires_at) "
-                    "VALUES (:short_id, :long_url, :expires_at) "
+                    "INSERT INTO urls (short_id, long_url, expires_at, user_id) "
+                    "VALUES (:short_id, :long_url, :expires_at, :user_id) "
                     "ON CONFLICT (short_id) DO NOTHING "
                     "RETURNING short_id"
                 ),
-                {"short_id": short_id, "long_url": long_url, "expires_at": expires_at},
+                {"short_id": short_id, "long_url": long_url,
+                 "expires_at": expires_at, "user_id": user_id},
             ).first()
         return row is not None
 
@@ -42,7 +45,7 @@ class UrlRepository:
         with self._engine.connect() as conn:
             row = conn.execute(
                 text(
-                    "SELECT short_id, long_url, created_at, expires_at, click_count, is_disabled "
+                    "SELECT short_id, long_url, created_at, expires_at, click_count, is_disabled, user_id "
                     "FROM urls WHERE short_id = :short_id"
                 ),
                 {"short_id": short_id},

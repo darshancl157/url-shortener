@@ -21,7 +21,9 @@ RESERVED = {"api", "docs", "redoc", "openapi.json", "health", "stats"}
 
 
 class UrlRepo(Protocol):
-    def insert(self, short_id: str, long_url: str, expires_at: datetime | None) -> bool: ...
+    def insert(
+        self, short_id: str, long_url: str, expires_at: datetime | None, user_id: int
+    ) -> bool: ...
     def hit(self, short_id: str) -> str | None: ...
     def stats(self, short_id: str) -> dict[str, Any] | None: ...
 
@@ -32,7 +34,7 @@ class UrlService:
         self._s = settings
 
     def shorten(
-        self, long_url: str, custom_alias: str | None, expires_at: datetime | None
+        self, long_url: str, custom_alias: str | None, expires_at: datetime | None, user_id: int
     ) -> tuple[str, str]:
         """Returns (short_id, normalized long_url)."""
         long_url = self._validate_url(long_url)
@@ -47,7 +49,7 @@ class UrlService:
                 raise BadRequestError(
                     "Alias must be 3-10 characters (letters, digits, - or _) and not reserved."
                 )
-            if not self._repo.insert(custom_alias, long_url, expires_at):
+            if not self._repo.insert(custom_alias, long_url, expires_at, user_id):
                 raise ConflictError("That alias is already taken.")
             return custom_alias, long_url
 
@@ -55,7 +57,7 @@ class UrlService:
             short_id = "".join(secrets.choice(ALPHABET) for _ in range(self._s.short_id_length))
             if short_id.lower() in RESERVED:
                 continue
-            if self._repo.insert(short_id, long_url, expires_at):
+            if self._repo.insert(short_id, long_url, expires_at, user_id):
                 return short_id, long_url
         raise IdGenerationError()
 
@@ -65,10 +67,10 @@ class UrlService:
             raise NotFoundError()
         return long_url
 
-    def stats(self, short_id: str) -> dict[str, Any]:
+    def stats(self, short_id: str, user_id: int) -> dict[str, Any]:
         row = self._repo.stats(short_id)
-        if row is None:
-            raise NotFoundError()
+        if row is None or row["user_id"] != user_id:
+            raise NotFoundError()  # someone else's link looks the same as a missing one
         return row
 
     def _validate_url(self, value: str) -> str:
