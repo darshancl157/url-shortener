@@ -51,3 +51,19 @@ class UrlRepository:
                 {"short_id": short_id},
             ).mappings().first()
         return dict(row) if row else None
+
+    def list_by_user(self, user_id: int, limit: int, offset: int) -> tuple[list[dict[str, Any]], int]:
+        """One page of a user's links, newest first, plus the user's total link count."""
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT short_id, long_url, created_at, expires_at, click_count, is_disabled "
+                    "FROM urls WHERE user_id = :user_id "
+                    "ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
+                ),
+                {"user_id": user_id, "limit": limit, "offset": offset},
+            ).mappings().all()
+            total = conn.execute(
+                text("SELECT count(*) FROM urls WHERE user_id = :user_id"), {"user_id": user_id}
+            ).scalar_one()
+        return [dict(r) for r in rows], total

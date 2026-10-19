@@ -7,7 +7,15 @@ from fastapi import APIRouter
 from fastapi.responses import RedirectResponse
 
 from app.api.deps import CurrentUserDep, SettingsDep, UrlServiceDep
-from app.schemas.url import ErrorResponse, ShortenRequest, ShortenResponse, StatsResponse
+from app.core.config import Settings
+from app.schemas.url import (
+    ErrorResponse,
+    ShortenRequest,
+    ShortenResponse,
+    StatsResponse,
+    UrlListItem,
+    UrlListResponse,
+)
 
 router = APIRouter(tags=["urls"])
 redirect_router = APIRouter(tags=["redirect"])
@@ -18,6 +26,10 @@ BAD_INPUT = {
     400: {"model": ErrorResponse, "description": "Invalid input"},
     409: {"model": ErrorResponse, "description": "Alias already taken"},
 }
+
+
+def _short_url(settings: Settings, short_id: str) -> str:
+    return f"{settings.base_url}/{short_id}"
 
 
 @router.post(
@@ -32,10 +44,27 @@ def shorten(
     short_id, long_url = service.shorten(body.long_url, body.custom_alias, body.expires_at, user_id)
     return ShortenResponse(
         short_id=short_id,
-        short_url=f"{settings.base_url}/{short_id}",
+        short_url=_short_url(settings, short_id),
         long_url=long_url,
         expires_at=body.expires_at,
     )
+
+
+@router.get(
+    "/api/urls",
+    response_model=UrlListResponse,
+    responses={400: BAD_INPUT[400], **UNAUTHORIZED},
+)
+def list_urls(
+    user_id: CurrentUserDep,
+    service: UrlServiceDep,
+    settings: SettingsDep,
+    limit: int = 50,
+    offset: int = 0,
+) -> UrlListResponse:
+    rows, total = service.list_urls(user_id, limit, offset)
+    items = [UrlListItem(**row, short_url=_short_url(settings, row["short_id"])) for row in rows]
+    return UrlListResponse(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.get(

@@ -24,3 +24,13 @@ class StatsResponse(BaseModel):
     expires_at: datetime | None = None
     click_count: int
     is_disabled: bool
+
+class UrlListItem(StatsResponse):
+    short_url: str
+
+
+class UrlListResponse(BaseModel):
+    items: list[UrlListItem]
+    total: int
+    limit: int
+    offset: int
