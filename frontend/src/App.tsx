@@ -6,6 +6,7 @@ import Footer from "./components/layouts/footer/Footer";
 import AuthForm from "./components/authForm/AuthForm";
 import ShortenForm from "./components/shortenForm/ShortenForm";
 import ShortResult from "./components/shortResult/ShortResult";
+import MyLinks from "./components/myLinks/MyLinks";
 import { logout, restoreSession, type User } from "./services/auth";
 import { setSessionExpiredHandler } from "./services/http";
 import { shortenUrl } from "./services/urls";
@@ -16,6 +17,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shortUrl, setShortUrl] = useState<string | null>(null);
+  const [linksVersion, setLinksVersion] = useState(0);
 
   useEffect(() => {
     setSessionExpiredHandler(() => setUser(null));
@@ -32,6 +34,7 @@ const App: React.FC = () => {
     try {
       const result = await shortenUrl(url);
       setShortUrl(result.short_url);
+      setLinksVersion((v) => v + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
@@ -62,6 +65,7 @@ const App: React.FC = () => {
         </div>
         <ShortenForm onSubmit={handleSubmit} loading={loading} error={error} />
         {shortUrl && <ShortResult shortUrl={shortUrl} />}
+        <MyLinks refreshKey={linksVersion} />
       </>
     );
   }

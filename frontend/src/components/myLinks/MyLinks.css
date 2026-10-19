@@ -1,0 +1,28 @@
+.mylinks {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin-top: 40px;
+}
+
+.mylinks-title {
+  font-size: 1.25rem;
+}
+
+.mylinks-error {
+  font-size: 0.875rem;
+  color: var(--error);
+}
+
+/* AG Grid needs a container with a real height */
+.mylinks-grid {
+  width: 100%;
+  height: 420px;
+}
+
+.mylinks-short {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}

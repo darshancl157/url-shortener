@@ -15,6 +15,10 @@
   overflow-wrap: anywhere;
 }
 
+.result > .button {
+  align-self: center;
+}
+
 @media (min-width: 600px) {
   .result {
     flex-direction: row;
