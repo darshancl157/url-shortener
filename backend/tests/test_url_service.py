@@ -1,3 +1,4 @@
+import itertools
 import unittest
 from datetime import datetime, timedelta, timezone
 
@@ -12,11 +13,13 @@ class FakeRepo:
     def __init__(self):
         self.rows: dict[str, dict] = {}
         self.always_conflict = False
+        self._clock = itertools.count()  # strictly increasing "created_at"
 
     def insert(self, short_id, long_url, expires_at, user_id):
         if self.always_conflict or short_id in self.rows:
             return False
-        self.rows[short_id] = {"long_url": long_url, "clicks": 0, "user_id": user_id}
+        self.rows[short_id] = {"short_id": short_id, "long_url": long_url, "clicks": 0,
+                               "user_id": user_id, "created_at": next(self._clock)}
         return True
 
     def hit(self, short_id):
@@ -28,6 +31,11 @@ class FakeRepo:
 
     def stats(self, short_id):
         return self.rows.get(short_id)
+
+    def list_by_user(self, user_id, limit, offset):
+        mine = sorted((r for r in self.rows.values() if r["user_id"] == user_id),
+                      key=lambda r: r["created_at"], reverse=True)
+        return mine[offset:offset + limit], len(mine)
 
 
 class UrlServiceTests(unittest.TestCase):
@@ -81,6 +89,25 @@ class UrlServiceTests(unittest.TestCase):
             self.svc.resolve("nope")
         with self.assertRaises(NotFoundError):
             self.svc.stats("nope", OWNER)
+
+    def test_list_urls_returns_only_callers_links_newest_first(self):
+        first, _ = self.shorten("https://a.com")
+        self.shorten("https://other.com", user_id=OTHER)
+        second, _ = self.shorten("https://b.com")
+        rows, total = self.svc.list_urls(OWNER, limit=10, offset=0)
+        self.assertEqual([r["short_id"] for r in rows], [second, first])
+        self.assertEqual(total, 2)
+
+    def test_list_urls_pages(self):
+        ids = [self.shorten(f"https://{i}.com")[0] for i in range(5)]
+        page, total = self.svc.list_urls(OWNER, limit=2, offset=2)
+        self.assertEqual([r["short_id"] for r in page], [ids[2], ids[1]])
+        self.assertEqual(total, 5)
+
+    def test_list_urls_validates_paging(self):
+        for limit, offset in [(0, 0), (101, 0), (10, -1)]:
+            with self.assertRaises(BadRequestError, msg=(limit, offset)):
+                self.svc.list_urls(OWNER, limit=limit, offset=offset)
 
 
 if __name__ == "__main__":

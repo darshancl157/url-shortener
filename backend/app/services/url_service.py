@@ -17,6 +17,7 @@ from app.core.exceptions import (
 
 ALPHABET = string.ascii_letters + string.digits
 ALIAS_RE = re.compile(r"^[A-Za-z0-9_-]{3,10}$")  # urls.short_id is VARCHAR(10)
+MAX_PAGE_SIZE = 100
 RESERVED = {"api", "docs", "redoc", "openapi.json", "health", "stats"}
 
 
@@ -26,7 +27,9 @@ class UrlRepo(Protocol):
     ) -> bool: ...
     def hit(self, short_id: str) -> str | None: ...
     def stats(self, short_id: str) -> dict[str, Any] | None: ...
-
+    def list_by_user(
+        self, user_id: int, limit: int, offset: int
+    ) -> tuple[list[dict[str, Any]], int]: ...
 
 class UrlService:
     def __init__(self, repo: UrlRepo, settings: Settings):
@@ -72,6 +75,15 @@ class UrlService:
         if row is None or row["user_id"] != user_id:
             raise NotFoundError()  # someone else's link looks the same as a missing one
         return row
+
+    def list_urls(
+        self, user_id: int, limit: int, offset: int
+    ) -> tuple[list[dict[str, Any]], int]:
+        if not 1 <= limit <= MAX_PAGE_SIZE:
+            raise BadRequestError(f"limit must be between 1 and {MAX_PAGE_SIZE}.")
+        if offset < 0:
+            raise BadRequestError("offset must be 0 or more.")
+        return self._repo.list_by_user(user_id, limit, offset)
 
     def _validate_url(self, value: str) -> str:
         value = value.strip()
