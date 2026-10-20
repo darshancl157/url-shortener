@@ -3,15 +3,23 @@ ever travels in an HttpOnly cookie scoped to /api/auth."""
 
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Response
+from fastapi import APIRouter, Cookie, Request, Response
 from fastapi.responses import JSONResponse
 
-from app.api.deps import AuthServiceDep, CurrentUserDep, SettingsDep
+from app.api import limits
+from app.api.deps import (
+    AuthServiceDep,
+    CurrentUserDep,
+    RateLimiterDep,
+    SettingsDep,
+    client_ip,
+    limit_by_ip,
+)
 from app.core.config import Settings
 from app.core.exceptions import UnauthorizedError
 from app.schemas.auth import Credentials, TokenResponse, UserResponse
 from app.schemas.url import ErrorResponse
-from app.services.auth_service import TokenPair
+from app.services.auth_service import AuthService, TokenPair
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -20,6 +28,7 @@ COOKIE_PATH = "/api/auth"
 _COOKIE_FLAGS = {"path": COOKIE_PATH, "httponly": True, "secure": True, "samesite": "strict"}
 
 UNAUTHORIZED = {401: {"model": ErrorResponse, "description": "Not authenticated"}}
+TOO_MANY = {429: {"model": ErrorResponse, "description": "Rate limit reached"}}
 RefreshCookie = Annotated[str | None, Cookie(alias=REFRESH_COOKIE)]
 
 
@@ -39,20 +48,46 @@ def _clear_cookie(response: Response) -> None:
     response.delete_cookie(REFRESH_COOKIE, **_COOKIE_FLAGS)
 
 
-@router.post("/register", response_model=UserResponse, status_code=201)
+@router.post(
+    "/register",
+    response_model=UserResponse,
+    status_code=201,
+    responses=TOO_MANY,
+    dependencies=[limit_by_ip("register", limits.REGISTER_PER_IP)],
+)
 def register(body: Credentials, service: AuthServiceDep) -> UserResponse:
     user_id = service.register(body.email, body.password)
     return UserResponse(**service.get_user(user_id))
 
 
-@router.post("/login", response_model=TokenResponse, responses=UNAUTHORIZED)
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    responses={**UNAUTHORIZED, **TOO_MANY},
+    dependencies=[limit_by_ip("login", limits.LOGIN_PER_IP)],
+)
 def login(
-    body: Credentials, response: Response, service: AuthServiceDep, settings: SettingsDep
+    body: Credentials,
+    request: Request,
+    response: Response,
+    service: AuthServiceDep,
+    settings: SettingsDep,
+    limiter: RateLimiterDep,
 ) -> TokenResponse:
+    # A tighter limit per (email, IP): slows password guessing against one account
+    # without letting a stranger lock that account out from their own IP.
+    email = AuthService.normalize_email(body.email, validate=False)
+    rule = limits.LOGIN_PER_EMAIL_AND_IP
+    limiter.check(f"login:email:{email}:ip:{client_ip(request)}", rule.limit, rule.window_seconds)
     return _issue(service.login(body.email, body.password), response, settings)
 
 
-@router.post("/refresh", response_model=TokenResponse, responses=UNAUTHORIZED)
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+    responses={**UNAUTHORIZED, **TOO_MANY},
+    dependencies=[limit_by_ip("refresh", limits.REFRESH_PER_IP)],
+)
 def refresh(
     response: Response,
     service: AuthServiceDep,

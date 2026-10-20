@@ -12,6 +12,7 @@ from app.api.routes import auth, health, urls
 from app.core.config import get_settings
 from app.core.exceptions import AppError
 from app.db.database import check_connection, make_engine
+from app.core.rate_limit import RateLimiter
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ def create_app() -> FastAPI:
         app.state.engine.dispose()
 
     app = FastAPI(title=settings.app_name, lifespan=lifespan)
+    app.state.rate_limiter = RateLimiter()
 
     app.add_middleware(
         CORSMiddleware,
@@ -39,10 +41,15 @@ def create_app() -> FastAPI:
     )
 
     @app.exception_handler(AppError)
-    async def handle_app_error(_request: Request, exc: AppError) -> JSONResponse:
+    async def handle_app_error(request: Request, exc: AppError) -> JSONResponse:
         if exc.status_code >= 500:
             logger.error("Request failed: %s", exc.message)
-        return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
+        elif exc.status_code == 429:
+            client = request.client.host if request.client else "unknown"
+            logger.warning("Rate limited %s %s from %s", request.method, request.url.path, client)
+        return JSONResponse(
+            status_code=exc.status_code, content={"detail": exc.message}, headers=exc.headers
+        )
 
     app.include_router(health.router)
     app.include_router(auth.router)
