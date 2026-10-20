@@ -65,7 +65,7 @@ class AuthService:
         self._now = now
 
     def register(self, email: str, password: str) -> int:
-        email = self._normalize_email(email)
+        email = self.normalize_email(email)
         if not MIN_PASSWORD <= len(password) <= MAX_PASSWORD:
             raise BadRequestError(f"Password must be {MIN_PASSWORD}-{MAX_PASSWORD} characters.")
         user_id = self._repo.create_user(email, hash_password(password))
@@ -74,7 +74,7 @@ class AuthService:
         return user_id
 
     def login(self, email: str, password: str) -> TokenPair:
-        user = self._repo.get_user_by_email(self._normalize_email(email, validate=False))
+        user = self._repo.get_user_by_email(self.normalize_email(email, validate=False))
         if user is None:
             verify_password(_dummy_hash(), password)
             raise UnauthorizedError(INVALID_LOGIN)
@@ -125,7 +125,7 @@ class AuthService:
         return self._now() + timedelta(days=self._s.refresh_token_ttl_days)
 
     @staticmethod
-    def _normalize_email(email: str, validate: bool = True) -> str:
+    def normalize_email(email: str, validate: bool = True) -> str:
         email = email.strip().lower()
         if validate and (len(email) > 254 or not EMAIL_RE.match(email)):
             raise BadRequestError("Enter a valid email address.")

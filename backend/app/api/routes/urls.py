@@ -6,7 +6,8 @@ so it doesn't swallow `/api/...`, `/health`, `/docs`, etc.
 from fastapi import APIRouter
 from fastapi.responses import RedirectResponse
 
-from app.api.deps import CurrentUserDep, SettingsDep, UrlServiceDep
+from app.api import limits
+from app.api.deps import CurrentUserDep, SettingsDep, UrlServiceDep, limit_by_ip, limit_by_user
 from app.core.config import Settings
 from app.schemas.url import (
     ErrorResponse,
@@ -22,6 +23,7 @@ redirect_router = APIRouter(tags=["redirect"])
 
 NOT_FOUND = {404: {"model": ErrorResponse, "description": "Short code not found"}}
 UNAUTHORIZED = {401: {"model": ErrorResponse, "description": "Not authenticated"}}
+TOO_MANY = {429: {"model": ErrorResponse, "description": "Rate limit reached"}}
 BAD_INPUT = {
     400: {"model": ErrorResponse, "description": "Invalid input"},
     409: {"model": ErrorResponse, "description": "Alias already taken"},
@@ -36,7 +38,8 @@ def _short_url(settings: Settings, short_id: str) -> str:
     "/api/shortenurl",
     response_model=ShortenResponse,
     status_code=201,
-    responses={**BAD_INPUT, **UNAUTHORIZED},
+    responses={**BAD_INPUT, **UNAUTHORIZED, **TOO_MANY},
+    dependencies=[limit_by_user("shorten", limits.SHORTEN_PER_USER)],
 )
 def shorten(
     body: ShortenRequest, user_id: CurrentUserDep, service: UrlServiceDep, settings: SettingsDep
@@ -53,7 +56,8 @@ def shorten(
 @router.get(
     "/api/urls",
     response_model=UrlListResponse,
-    responses={400: BAD_INPUT[400], **UNAUTHORIZED},
+    responses={400: BAD_INPUT[400], **UNAUTHORIZED, **TOO_MANY},
+    dependencies=[limit_by_user("list", limits.LIST_PER_USER)],
 )
 def list_urls(
     user_id: CurrentUserDep,
@@ -68,12 +72,21 @@ def list_urls(
 
 
 @router.get(
-    "/api/stats/{short_id}", response_model=StatsResponse, responses={**NOT_FOUND, **UNAUTHORIZED}
+    "/api/stats/{short_id}",
+    response_model=StatsResponse,
+    responses={**NOT_FOUND, **UNAUTHORIZED, **TOO_MANY},
+    dependencies=[limit_by_user("stats", limits.LIST_PER_USER)],
 )
 def stats(short_id: str, user_id: CurrentUserDep, service: UrlServiceDep) -> StatsResponse:
     return StatsResponse(**service.stats(short_id, user_id))
 
 
-@redirect_router.get("/{short_id}", status_code=302, responses=NOT_FOUND, response_class=RedirectResponse)
+@redirect_router.get(
+    "/{short_id}",
+    status_code=302,
+    responses={**NOT_FOUND, **TOO_MANY},
+    response_class=RedirectResponse,
+    dependencies=[limit_by_ip("redirect", limits.REDIRECT_PER_IP)],
+)
 def redirect(short_id: str, service: UrlServiceDep) -> RedirectResponse:
     return RedirectResponse(service.resolve(short_id), status_code=302)

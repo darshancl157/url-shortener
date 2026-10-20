@@ -4,6 +4,7 @@
 class AppError(Exception):
     status_code = 500
     message = "Internal server error."
+    headers: dict[str, str] | None = None
 
     def __init__(self, message: str | None = None):
         super().__init__(message or self.message)
@@ -31,3 +32,11 @@ class IdGenerationError(AppError):
 class UnauthorizedError(AppError):
     status_code = 401
     message = "Not authenticated."
+
+class TooManyRequestsError(AppError):
+    status_code = 429
+    message = "Too many requests. Try again later."
+
+    def __init__(self, retry_after: int):
+        super().__init__(f"Too many requests. Try again in {retry_after} seconds.")
+        self.headers = {"Retry-After": str(retry_after)}
