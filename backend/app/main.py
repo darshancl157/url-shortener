@@ -13,6 +13,7 @@ from app.core.config import get_settings
 from app.core.exceptions import AppError
 from app.db.database import check_connection, make_engine
 from app.core.rate_limit import RateLimiter
+from app.core.security_headers import security_headers_for
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,12 @@ def create_app() -> FastAPI:
 
     app = FastAPI(title=settings.app_name, lifespan=lifespan)
     app.state.rate_limiter = RateLimiter()
+    @app.middleware("http")
+    async def add_security_headers(request: Request, call_next):
+        response = await call_next(request)
+        for name, value in security_headers_for(request.url.path).items():
+            response.headers.setdefault(name, value)
+        return response
 
     app.add_middleware(
         CORSMiddleware,
