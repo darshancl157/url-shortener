@@ -63,6 +63,12 @@ jobs:
           code=$(curl -s -o body.json -w '%{http_code}' "$API_URL/smoke-check-missing")
           cat body.json; echo
           test "$code" = "404"
+      - name: Security headers on API
+        run: |
+          headers=$(curl -s -D - -o /dev/null "$API_URL/health")
+          echo "$headers"
+          echo "$headers" | grep -qi "^x-content-type-options: nosniff"
+          echo "$headers" | grep -qi "^content-security-policy: default-src 'none'"
 
   deploy-uat-web:
     if: startsWith(github.ref, 'refs/heads/release/')
@@ -95,3 +101,9 @@ jobs:
           cat body.json; echo
           test "$code" = "401"
           grep -q '"detail"' body.json
+      - name: Security headers on web
+        run: |
+          headers=$(curl -s -D - -o /dev/null "$WEB_URL/")
+          echo "$headers"
+          echo "$headers" | grep -qi "^content-security-policy:.*frame-ancestors 'none'"
+          echo "$headers" | grep -qi "^x-content-type-options: nosniff"
