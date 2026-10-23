@@ -39,6 +39,7 @@ class Settings:
     jwt_secret: str = ""
     access_token_ttl_minutes: int = 15
     refresh_token_ttl_days: int = 14
+    client_ip_header: str = ""
 
 @lru_cache
 def get_settings() -> Settings:
@@ -56,4 +57,5 @@ def get_settings() -> Settings:
         cors_origins=_split_csv(os.getenv("CORS_ORIGINS", "")),
         cors_origin_regex=Settings.cors_origin_regex if allow_localhost else None,
         jwt_secret=os.getenv("JWT_SECRET", ""),
+        client_ip_header=os.getenv("CLIENT_IP_HEADER", "").strip().lower(),
     )
