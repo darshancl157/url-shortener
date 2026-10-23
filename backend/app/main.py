@@ -15,6 +15,8 @@ from app.db.database import check_connection, make_engine
 from app.core.rate_limit import RateLimiter
 from app.core.security_headers import security_headers_for
 
+from app.api.deps import client_ip
+
 logger = logging.getLogger(__name__)
 
 def create_app() -> FastAPI:
@@ -52,8 +54,12 @@ def create_app() -> FastAPI:
         if exc.status_code >= 500:
             logger.error("Request failed: %s", exc.message)
         elif exc.status_code == 429:
-            client = request.client.host if request.client else "unknown"
-            logger.warning("Rate limited %s %s from %s", request.method, request.url.path, client)
+            h = request.headers
+            logger.warning(
+                "Rate limited %s %s from %s xff=%r cf=%r true=%r",
+                request.method, request.url.path, client_ip(request),
+                h.get("x-forwarded-for"), h.get("cf-connecting-ip"), h.get("true-client-ip"),
+            )
         return JSONResponse(
             status_code=exc.status_code, content={"detail": exc.message}, headers=exc.headers
         )
