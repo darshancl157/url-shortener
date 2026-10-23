@@ -2,6 +2,8 @@
 
 from typing import Annotated
 
+import ipaddress
+
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -53,9 +55,15 @@ def get_rate_limiter(request: Request) -> RateLimiter:
 RateLimiterDep = Annotated[RateLimiter, Depends(get_rate_limiter)]
 
 
-def client_ip(request: Request) -> str:
-    # Behind a proxy, uvicorn's proxy-header handling has already replaced the proxy's
-    # address with the forwarded client address. Verified per environment, not assumed.
+def client_ip(request: Request, header: str | None = None) -> str:
+    """The caller's IP: from the header our edge proxy sets (clients can't forge it), else the socket peer."""
+    if header is None:
+        header = get_settings().client_ip_header
+    if header:
+        try:
+            return str(ipaddress.ip_address(request.headers.get(header, "").strip()))
+        except ValueError:
+            pass
     return request.client.host if request.client else "unknown"
 
 
