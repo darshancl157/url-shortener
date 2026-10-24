@@ -15,95 +15,18 @@ jobs:
   ci:
     uses: ./.github/workflows/ci.yml
 
-  migrate-uat:
+  uat:
     if: startsWith(github.ref, 'refs/heads/release/')
     needs: ci
-    runs-on: ubuntu-latest
-    environment: uat
-    env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-    defaults:
-      run:
-        working-directory: backend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-backend
-      - name: Revision before
-        run: alembic current
-      - name: Upgrade to head
-        run: alembic upgrade head
-      - name: Revision after
-        run: alembic current
+    uses: ./.github/workflows/deploy-env.yml
+    with:
+      environment: uat
+    secrets: inherit
 
-  deploy-uat:
-    if: startsWith(github.ref, 'refs/heads/release/')
-    needs: migrate-uat
-    runs-on: ubuntu-latest
-    environment: uat
-    steps:
-      - name: Trigger Render deploy of this exact commit (API)
-        env:
-          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
-        run: curl --fail-with-body -sS -X POST "$HOOK&ref=$GITHUB_SHA"
-
-  smoke-uat:
-    if: startsWith(github.ref, 'refs/heads/release/')
-    needs: deploy-uat
-    runs-on: ubuntu-latest
-    environment: uat
-    timeout-minutes: 15
-    env:
-      API_URL: ${{ vars.API_URL }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Wait until the API serves this commit
-        run: bash .github/scripts/wait-for-commit.sh "$API_URL/health"
-      - name: API can query the database
-        run: |
-          code=$(curl -s -o body.json -w '%{http_code}' "$API_URL/smoke-check-missing")
-          cat body.json; echo
-          test "$code" = "404"
-      - name: Security headers on API
-        run: |
-          headers=$(curl -s -D - -o /dev/null "$API_URL/health")
-          echo "$headers"
-          echo "$headers" | grep -qi "^x-content-type-options: nosniff"
-          echo "$headers" | grep -qi "^content-security-policy: default-src 'none'"
-
-  deploy-uat-web:
-    if: startsWith(github.ref, 'refs/heads/release/')
-    needs: smoke-uat
-    runs-on: ubuntu-latest
-    environment: uat
-    steps:
-      - name: Trigger Render deploy of this exact commit (web)
-        env:
-          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
-        run: curl --fail-with-body -sS -X POST "$HOOK&ref=$GITHUB_SHA"
-
-  smoke-uat-web:
-    if: startsWith(github.ref, 'refs/heads/release/')
-    needs: deploy-uat-web
-    runs-on: ubuntu-latest
-    environment: uat
-    timeout-minutes: 15
-    env:
-      WEB_URL: ${{ vars.WEB_URL }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Wait until the site serves this commit
-        run: bash .github/scripts/wait-for-commit.sh "$WEB_URL/version.json"
-      - name: Site's index page loads
-        run: curl --fail -sS "$WEB_URL/" | grep -q '<div id="root">'
-      - name: Site forwards /api to the API (same-origin proxy)
-        run: |
-          code=$(curl -s -o body.json -w '%{http_code}' -X POST "$WEB_URL/api/auth/refresh")
-          cat body.json; echo
-          test "$code" = "401"
-          grep -q '"detail"' body.json
-      - name: Security headers on web
-        run: |
-          headers=$(curl -s -D - -o /dev/null "$WEB_URL/")
-          echo "$headers"
-          echo "$headers" | grep -qi "^content-security-policy:.*frame-ancestors 'none'"
-          echo "$headers" | grep -qi "^x-content-type-options: nosniff"
+  prod:
+    if: github.ref == 'refs/heads/main'
+    needs: ci
+    uses: ./.github/workflows/deploy-env.yml
+    with:
+      environment: prod
+    secrets: inherit
