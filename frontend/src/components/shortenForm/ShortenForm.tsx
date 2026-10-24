@@ -1,5 +1,6 @@
 import { useState } from "react";
 import "./ShortenForm.css";
+import Button from "../common/button/Button";
 
 const ShortenForm: React.FC<{
   onSubmit: (url: string) => void;
@@ -28,9 +29,9 @@ const ShortenForm: React.FC<{
           aria-describedby={error ? "shorten-error" : undefined}
           autoFocus
         />
-        <button type="submit" className="button" disabled={loading}>
+        <Button type="submit" disabled={loading}>
           {loading ? "Shortening…" : "Shorten"}
-        </button>
+        </Button>
       </div>
       {error && (
         <p id="shorten-error" className="error" role="alert">

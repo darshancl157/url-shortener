@@ -35,7 +35,11 @@ class Settings:
     short_id_length: int = 6
     max_url_length: int = 2048
     max_id_attempts: int = 10
-
+    git_commit: str = "unknown"
+    jwt_secret: str = ""
+    access_token_ttl_minutes: int = 15
+    refresh_token_ttl_days: int = 14
+    client_ip_header: str = ""
 
 @lru_cache
 def get_settings() -> Settings:
@@ -43,13 +47,15 @@ def get_settings() -> Settings:
     database_url = os.getenv("DATABASE_URL", "")
     if not database_url:
         raise RuntimeError(
-            "DATABASE_URL is not set. Example: "
-            "postgresql+psycopg://user:password@localhost:5432/url_shortener"
+            "DATABASE_URL is not set."
         )
     allow_localhost = os.getenv("CORS_ALLOW_LOCALHOST", "true").lower() in {"1", "true", "yes"}
     return Settings(
         database_url=database_url,
         base_url=os.getenv("BASE_URL", Settings.base_url).rstrip("/"),
+        git_commit=os.getenv("RENDER_GIT_COMMIT", Settings.git_commit),
         cors_origins=_split_csv(os.getenv("CORS_ORIGINS", "")),
         cors_origin_regex=Settings.cors_origin_regex if allow_localhost else None,
+        jwt_secret=os.getenv("JWT_SECRET", ""),
+        client_ip_header=os.getenv("CLIENT_IP_HEADER", "").strip().lower(),
     )

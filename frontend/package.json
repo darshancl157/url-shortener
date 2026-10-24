@@ -6,10 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:deploy": "npm run build && node scripts/write-version.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
+    "ag-grid-community": "^36.2.0",
+    "ag-grid-react": "^36.2.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },

@@ -17,3 +17,32 @@
   justify-content: center;
   padding: 48px 0;
 }
+
+.app-content {
+  width: 100%;
+}
+
+.app-status {
+  text-align: center;
+}
+
+.app-session {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 640px;
+  margin: 0 auto 16px;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.app-logout {
+  flex-shrink: 0;
+  padding: 4px;
+  color: var(--accent);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}

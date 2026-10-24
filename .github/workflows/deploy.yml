@@ -1,0 +1,32 @@
+name: Deploy
+
+on:
+  push:
+    branches: ["release/**", main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  uat:
+    if: startsWith(github.ref, 'refs/heads/release/')
+    needs: ci
+    uses: ./.github/workflows/deploy-env.yml
+    with:
+      environment: uat
+    secrets: inherit
+
+  prod:
+    if: github.ref == 'refs/heads/main'
+    needs: ci
+    uses: ./.github/workflows/deploy-env.yml
+    with:
+      environment: prod
+    secrets: inherit

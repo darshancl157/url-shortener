@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, "release/**", main]
+  push:
+    branches: [develop]
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-backend
+      - name: Audit Python dependencies
+        working-directory: backend
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt
+      - run: python -m unittest discover -s tests -t . -v
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Audit npm dependencies
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
+      - run: npm run build
+
+  migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: url_shortener_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/url_shortener_ci
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-backend
+
+      - name: Upgrade to head
+        run: alembic upgrade head
+
+      - name: Check the urls table exists
+        run: |
+          python -c "
+          import os
+          from sqlalchemy import create_engine, text
+          e = create_engine(os.environ['DATABASE_URL'])
+          t = e.connect().execute(text(\"select to_regclass('public.urls')\")).scalar()
+          assert t == 'urls', f'urls table missing: {t}'
+          print('urls table OK')
+          "
+
+      - name: Downgrade to base
+        run: alembic downgrade base
+
+      - name: Upgrade to head again
+        run: alembic upgrade head
