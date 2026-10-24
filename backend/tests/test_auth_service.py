@@ -155,6 +155,5 @@ class AuthServiceTests(unittest.TestCase):
         self.svc.logout(None)
         self.svc.logout("unknown")
 
-
 if __name__ == "__main__":
     unittest.main()
